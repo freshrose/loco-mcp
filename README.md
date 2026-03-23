@@ -16,14 +16,17 @@ This MCP provides tools to:
 
 ### API Key
 
-You can provide your Loco API key in two ways:
+You can provide your Loco API key in three ways:
 
 1. **Environment variable** (recommended): Set `LOCO_API_KEY` in your MCP server configuration
-2. **Per-tool parameter**: Pass `apiKey` as a parameter to any tool call
+2. **Project name**: Use the `project` parameter on any tool call (see [Multi-Project Setup](#multi-project-setup))
+3. **Per-tool parameter**: Pass `apiKey` directly as a parameter to any tool call
 
 You can find your API key in your Loco project under **Developer Tools -> API Keys (Full Access Key)**.
 
-### OpenCode
+### Single Project
+
+#### OpenCode
 
 ```json
 {
@@ -40,7 +43,7 @@ You can find your API key in your Loco project under **Developer Tools -> API Ke
 }
 ```
 
-### Claude Desktop
+#### Claude Desktop
 
 ```json
 {
@@ -55,6 +58,59 @@ You can find your API key in your Loco project under **Developer Tools -> API Ke
   }
 }
 ```
+
+### Multi-Project Setup
+
+If you manage multiple Loco projects, you can configure named API keys and switch between them using the `project` parameter on any tool call.
+
+#### Option 1: Named environment variables
+
+Set `LOCO_API_KEY_<NAME>` for each project (name is uppercased, non-alphanumeric characters become `_`):
+
+```json
+{
+  "mcpServers": {
+    "loco": {
+      "command": "npx",
+      "args": ["-y", "loco-mcp"],
+      "env": {
+        "LOCO_API_KEY": "default-key",
+        "LOCO_API_KEY_MOBILE": "mobile-project-key",
+        "LOCO_API_KEY_WEB": "web-project-key"
+      }
+    }
+  }
+}
+```
+
+Then use `project: "mobile"` or `project: "web"` in your tool calls.
+
+#### Option 2: JSON mapping
+
+Set `LOCO_PROJECTS` with a JSON object mapping project names to API keys:
+
+```json
+{
+  "mcpServers": {
+    "loco": {
+      "command": "npx",
+      "args": ["-y", "loco-mcp"],
+      "env": {
+        "LOCO_API_KEY": "default-key",
+        "LOCO_PROJECTS": "{\"mobile\":\"mobile-project-key\",\"web\":\"web-project-key\"}"
+      }
+    }
+  }
+}
+```
+
+#### Resolution priority
+
+When a tool is called, the API key is resolved in this order:
+
+1. `apiKey` parameter (explicit key, highest priority)
+2. `project` parameter (looks up from `LOCO_API_KEY_<NAME>` then `LOCO_PROJECTS`)
+3. `LOCO_API_KEY` environment variable (default fallback)
 
 ## Available Tools
 
