@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { resolveProjectKey, getClient } from "./project-keys.js";
 import { LocoClient } from "./loco-client.js";
 
@@ -57,6 +57,24 @@ describe("resolveProjectKey", () => {
 describe("getClient", () => {
   const savedEnv = process.env;
 
+  function stubFetch() {
+    const mock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve("[]"),
+      headers: new Headers(),
+    });
+    vi.stubGlobal("fetch", mock);
+    return mock;
+  }
+
+  async function getUsedApiKey(client: LocoClient): Promise<string> {
+    const fetchMock = stubFetch();
+    await client.listLocales();
+    const [, options] = fetchMock.mock.calls[0];
+    return options.headers.Authorization.replace("Loco ", "");
+  }
+
   beforeEach(() => {
     process.env = { ...savedEnv };
     delete process.env.LOCO_API_KEY;
@@ -64,37 +82,38 @@ describe("getClient", () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     process.env = savedEnv;
   });
 
-  it("uses explicit apiKey when provided", () => {
+  it("uses explicit apiKey when provided", async () => {
     const client = getClient("explicit-key");
-    expect(client).toBeInstanceOf(LocoClient);
+    expect(await getUsedApiKey(client)).toBe("explicit-key");
   });
 
-  it("resolves project name to API key", () => {
+  it("resolves project name to API key", async () => {
     process.env.LOCO_API_KEY_MOBILE = "mobile-key";
     const client = getClient(undefined, "mobile");
-    expect(client).toBeInstanceOf(LocoClient);
+    expect(await getUsedApiKey(client)).toBe("mobile-key");
   });
 
-  it("falls back to LOCO_API_KEY when no apiKey or project", () => {
+  it("falls back to LOCO_API_KEY when no apiKey or project", async () => {
     process.env.LOCO_API_KEY = "default-key";
     const client = getClient();
-    expect(client).toBeInstanceOf(LocoClient);
+    expect(await getUsedApiKey(client)).toBe("default-key");
   });
 
-  it("falls back to LOCO_API_KEY when project is unresolvable", () => {
+  it("falls back to LOCO_API_KEY when project is unresolvable", async () => {
     process.env.LOCO_API_KEY = "default-key";
     const client = getClient(undefined, "unknown-project");
-    expect(client).toBeInstanceOf(LocoClient);
+    expect(await getUsedApiKey(client)).toBe("default-key");
   });
 
-  it("explicit apiKey takes priority over project and env", () => {
+  it("explicit apiKey takes priority over project and env", async () => {
     process.env.LOCO_API_KEY = "default-key";
     process.env.LOCO_API_KEY_MOBILE = "mobile-key";
     const client = getClient("explicit-key", "mobile");
-    expect(client).toBeInstanceOf(LocoClient);
+    expect(await getUsedApiKey(client)).toBe("explicit-key");
   });
 
   it("throws when no key found by any method", () => {
